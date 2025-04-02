@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import NamedTuple, List, Optional, DefaultDict, Dict
+from typing import DefaultDict, Dict, List, NamedTuple, Optional
 
 import requests_html
 
@@ -106,12 +106,14 @@ class Suffix(StrEnum):
 
 
 PyVersion = None
+
+
 class PyVersionMeta(type):
     def __getattr__(self, name):
         """Generate PyVersion.PYXXX on demand to future-proof it"""
         if PyVersion is not None:
             return PyVersion(name.lower())
-        return super(PyVersionMeta,self).__getattr__(self, name)
+        return super(PyVersionMeta, self).__getattr__(self, name)
 
 
 @dataclass(frozen=True)
@@ -213,22 +215,24 @@ class CondaVersion(NamedTuple):
                 return PyVersion.PY37
             else:
                 # since 4.8, Miniconda specifies versions explicitly in the file name
-                raise ValueError("Miniconda 4.8+ is supposed to specify a Python version explicitly")
+                raise ValueError(
+                    "Miniconda 4.8+ is supposed to specify a Python version explicitly"
+                )
         if self.flavor == "anaconda":
             # https://docs.anaconda.com/free/anaconda/reference/release-notes/
-            if v >= (2024,6):
+            if v >= (2024, 6):
                 return PyVersion.PY312
-            if v >= (2023,7):
+            if v >= (2023, 7):
                 return PyVersion.PY311
-            if v >= (2023,3):
+            if v >= (2023, 3):
                 return PyVersion.PY310
-            if v >= (2021,11):
+            if v >= (2021, 11):
                 return PyVersion.PY39
-            if v >= (2020,7):
+            if v >= (2020, 7):
                 return PyVersion.PY38
-            if v >= (2020,2):
+            if v >= (2020, 2):
                 return PyVersion.PY37
-            if v >= (5,3,0):
+            if v >= (5, 3, 0):
                 return PyVersion.PY37
             return PyVersion.PY36
 
@@ -270,7 +274,7 @@ class CondaSpec(NamedTuple):
             SupportedArch(arch),
             md5,
             repo,
-            py_ver
+            py_ver,
         )
         if py_version is None and py_ver is None and ver != "latest":
             spec = spec.with_py_version(spec.version.default_py_version())
@@ -286,7 +290,9 @@ class CondaSpec(NamedTuple):
             repo=self.repo,
             suffix=self.version.suffix,
             version_str=self.version.version_str,
-            version_py_version=f"{self.version.py_version}_" if self.version.py_version else "",
+            version_py_version=(
+                f"{self.version.py_version}_" if self.version.py_version else ""
+            ),
             os=self.os,
             arch=self.arch,
             md5=self.md5,
@@ -311,7 +317,7 @@ def get_existing_condas(name):
 
     :returns: A generator of :class:`CondaVersion` objects.
     """
-    logger.info("Getting known %(name)s versions",locals())
+    logger.info("Getting known %(name)s versions", locals())
     for p in out_dir.iterdir():
         entry_name = p.name
         if not p.is_file() or not entry_name.startswith(name):
@@ -332,7 +338,7 @@ def get_available_condas(name, repo):
     :returns: A generator of :class:`CondaSpec` objects for each release available for download
     except rolling releases.
     """
-    logger.info("Fetching remote %(name)s versions",locals())
+    logger.info("Fetching remote %(name)s versions", locals())
     session = requests_html.HTMLSession()
     response = session.get(repo)
     page: requests_html.HTML = response.html
@@ -369,11 +375,16 @@ def key_fn(spec: CondaSpec):
 if __name__ == "__main__":
     parser = ArgumentParser(description=__doc__)
     parser.add_argument(
-        "-d", "--dry-run", action="store_true",
+        "-d",
+        "--dry-run",
+        action="store_true",
         help="Do not write scripts, just report them to stdout",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", default=0,
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=0,
         help="Increase verbosity of logging",
     )
     parsed = parser.parse_args()
@@ -382,14 +393,12 @@ if __name__ == "__main__":
 
     existing_versions = set()
     available_specs = set()
-    for name,repo in ("miniconda",MINICONDA_REPO),("anaconda",ANACONDA_REPO):
+    for name, repo in ("miniconda", MINICONDA_REPO), ("anaconda", ANACONDA_REPO):
         existing_versions |= set(get_existing_condas(name))
         available_specs |= set(get_available_condas(name, repo))
 
     # version triple to triple-ified spec to raw spec
-    to_add: DefaultDict[
-        CondaVersion, Dict[CondaSpec, CondaSpec]
-    ] = defaultdict(dict)
+    to_add: DefaultDict[CondaVersion, Dict[CondaSpec, CondaSpec]] = defaultdict(dict)
 
     logger.info("Checking for new versions")
     for s in sorted(available_specs, key=key_fn):
